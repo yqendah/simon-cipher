@@ -36,10 +36,17 @@ uint64_t getKeyLow(char *key) {
         keyLow = (keyLow << 4) | (((key[i] >= '0' && key[i] <= '9') ? (key[i] - '0') : (key[i] - 'a' + 10)) & 0xF);
     return keyLow;
 }
+//Convert words (input) into bytes.
+uint32_t Words32ToBytes(uint32_t value) {
+    return ((uint32_t) ((uint8_t) value) << 24 | (uint32_t) (uint8_t) (value >> 8) << 16 |
+            (uint32_t) (uint8_t) (value >> 16) << 8 | (uint32_t) (uint8_t) (value >> 24));
+}
+//Covert bytes into words (output).
+uint32_t BytesToWords32(uint32_t value)
+{
 
-uint32_t form32BitBlock(uint32_t key) {
-    return ((uint32_t) ((uint8_t) key) << 24 | (uint32_t) (uint8_t) (key >> 8) << 16 |
-            (uint32_t) (uint8_t) (key >> 16) << 8 | (uint32_t) (uint8_t) (key >> 24));
+    return ((uint32_t) (uint8_t) (value >> 24) | (uint32_t) (uint8_t) (value >> 16) << 8 |
+            (uint32_t) (uint8_t) (value >> 8) << 16 | (uint32_t) ((uint8_t) value) << 24);
 }
 
 // function that generates subKeys from the key according to the SIMON key scheduling algorithm for a 128-bit key
@@ -53,10 +60,10 @@ uint32_t *generateSubkeys(char *key) {
     //we allocate space for 32 subkeys, since there are 32 rounds
     uint32_t *roundKeys = malloc(44 * (sizeof(uint32_t)));
 
-    roundKeys[0] = form32BitBlock(KeyHigh >> 32);
-    roundKeys[1] = form32BitBlock(KeyHigh);
-    roundKeys[2] = form32BitBlock(KeyLow >> 32);
-    roundKeys[3] = form32BitBlock(KeyLow);
+    roundKeys[0] = Words32ToBytes(KeyHigh >> 32);
+    roundKeys[1] = Words32ToBytes(KeyHigh);
+    roundKeys[2] = Words32ToBytes(KeyLow >> 32);
+    roundKeys[3] = Words32ToBytes(KeyLow);
 
     for (int i = 4; i < 44; ++i) {
         uint32_t test = ROR(roundKeys[i - 1], 3);
@@ -77,8 +84,8 @@ char *encrypt(char *plaintext, char *key) {
     //convert the plaintext from a Hex String to a 64-bit integer
     uint64_t state = fromHexStringToLong(plaintext);
     //split block of plain text into 2 blocks.
-    uint32_t rightPlainBlock = form32BitBlock(state >> 32);
-    uint32_t leftPlainBlock = form32BitBlock(state);
+    uint32_t rightPlainBlock = Words32ToBytes(state >> 32);
+    uint32_t leftPlainBlock = Words32ToBytes(state);
 
     for (int i = 0; i < 44; i++) {
 
@@ -117,7 +124,7 @@ char *decrypt(char *ciphertext, char *key) {
 
 
     state = state & 0;
-    state = ((state | leftCipherBlock) << 32) | rightCipherBlock;
+    state = ((state | BytesToWords32(rightCipherBlock)) << 32) | BytesToWords32(leftCipherBlock);
 
     return fromLongToHexString(state);
 }
